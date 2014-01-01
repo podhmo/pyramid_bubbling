@@ -173,16 +173,16 @@ def verify_bubbling_path(config, startpoint, expected, name="", access=None):
 def verify_bubbling_event(config, startpoint, event_name="", path_name="", access=None):
     bubbling = Bubbling(access or get_bubbling_registry_access(config, path_name))
     r = []
-    try:
-        for subject, ev in bubbling.get_ordered_event(startpoint, event_name):
-            if subject is None:
-                break
-            if ev is None:
-                raise BubblingConfigurationError("subject={}, not bound event.".format(subject))
-            r.append(ev)
-    except Exception as e:
-        raise BubblingConfigurationError("exception={}, not bound event.".format(e))
+    for subject, ev in bubbling.get_ordered_event(startpoint, event_name):
+        if subject is None:
+            break
+        if ev is None:
+            raise BubblingConfigurationError("subject={}, not bound event. registered event:({})".format(
+                subject, 
+                config.registry.adapters.lookupAll([implementedBy(startpoint)], IEvent)
+            ))
+        r.append(ev)
     return r
 
-def get_bubbling_registry_access(config, path_name):
+def get_bubbling_registry_access(config, path_name=""):
     return RegistryAccessForClass(config.registry, name=path_name)

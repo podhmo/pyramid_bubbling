@@ -59,7 +59,7 @@ class RegistryAccess(object):
         try:
             fn = self.cache[target]
         except KeyError:
-            fn = _lookup(self.registry, providedBy(target), name=self.name)
+            fn = _lookup(self.registry, [providedBy(target)], name=self.name)
             if fn is None:
                 return fn
             self.cache[target] = fn
@@ -84,13 +84,16 @@ class RegistryAccessForClass(object):
         self.registry = registry
         self.name = name
 
+    def lookup(self, target):
+        return _lookup(self.registry, [implementedBy(target)], name=self.name)
+
     def exists(self, target):
         ## todo: speedup if need.
-        fn = _lookup(self.registry, implementedBy(target), name=self.name)
+        fn = self.lookup(target)
         return bool(fn and fn.from_class(target))
 
     def access(self, target):
-        return _lookup(self.registry, implementedBy(target), name=self.name).from_class(target)
+        return self.lookup(target).from_class(target)
 
     def get_notify(self, target, name):
         return self.registry.adapters.lookup([implementedBy(target)], IEvent, name=name)
@@ -135,13 +138,14 @@ def _add_bubbling_event(registry, SubjectClass, fn, name="", dynamic=True):
     iface = iface_from_class(SubjectClass, dynamic=dynamic, Exception=BubblingConfigurationError)
     if not isinstance(iface, (list, tuple)):
         iface = [iface]
-    registry.adapters.register(iface, IEvent, name, provider(IEvent)(fn))
+    fn = provider(IEvent)(fn)
+    registry.adapters.register(iface, IEvent, name, fn)
 
 def add_bubbling_event(config, SubjectClass, fn, name=""):
     _add_bubbling_event(config.registry, config.maybe_dotted(SubjectClass), fn, name=name)
 
 def _lookup(registry, obj, name=""):
-    return registry.adapters.lookup1(obj, IParentFromInstanceAdapter, name=name)
+    return registry.adapters.lookup(obj, IParentFromInstanceAdapter, name=name)
 
 def lookup(request, iface, name=""):
     return _lookup(request.registry, iface, name=name)
@@ -157,20 +161,28 @@ def bubbling_event_config(SubjectClass, name=""):
         return wrapped
     return _
 
-def verify_bubbling_path(config, startpoint, expected, name=""):
+def verify_bubbling_path(config, startpoint, expected, name="", access=None):
     from pyramid.config.util import MAX_ORDER
     def register():
-        bubbling = Bubbling(RegistryAccessForClass(config.registry))
+        bubbling = Bubbling(access or get_bubbling_registry_access(config, name))
         result = bubbling.get_bubbling_path_order(startpoint)
         if not (result == expected):
             raise BubblingConfigurationError("expected:{} != result:{}".format(expected, result))
     config.action(None, register, order=MAX_ORDER)
 
-def verify_bubbling_event(config, startpoint, event_name="", path_name=""):
-    bubbling = Bubbling(RegistryAccessForClass(config.registry, path_name))
+def verify_bubbling_event(config, startpoint, event_name="", path_name="", access=None):
+    bubbling = Bubbling(access or get_bubbling_registry_access(config, path_name))
     r = []
-    for subject, ev in bubbling.get_ordered_event(startpoint, event_name):
-        if ev is None:
-            raise BubblingConfigurationError("subject={}, not bound event.".format(subject))
-        r.append(ev)
+    try:
+        for subject, ev in bubbling.get_ordered_event(startpoint, event_name):
+            if subject is None:
+                break
+            if ev is None:
+                raise BubblingConfigurationError("subject={}, not bound event.".format(subject))
+            r.append(ev)
+    except Exception as e:
+        raise BubblingConfigurationError("exception={}, not bound event.".format(e))
     return r
+
+def get_bubbling_registry_access(config, path_name):
+    return RegistryAccessForClass(config.registry, name=path_name)

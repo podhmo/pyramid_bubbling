@@ -36,6 +36,26 @@ class Z(object):
     def __init__(self, parent):
         self.parent = parent
 
+
+class I(object):
+    parent = None
+    def on_called(self, subject):
+        pass
+
+class J(object):
+    parent = I
+    def __init__(self, parent):
+        self.parent = parent
+    def on_called(self, subject):
+        pass
+
+class K(object):
+    parent = J
+    def __init__(self, parent):
+        self.parent = parent
+    def on_called(self, subject):
+        pass
+
 class ConfigurationTestsBase(unittest.TestCase):
     def setUp(self):
         self.config = testing.setUp()
@@ -136,6 +156,31 @@ class ConfigurationBubblingVerifyEventTests(ConfigurationTestsBase):
         result = config.verify_bubbling_event(C, "called")
         compare(result, [called, called, called])
 
+
+class ConfigurationForSimpleBubblingTests(ConfigurationTestsBase):
+    def test_bubbling_path(self):
+        from pyramid_bubbling import Accessor
+        config = self.config
+        config.verify_bubbling_path(K, [K, J, I], access=Accessor("parent"))
+
+    def test__bubbling_path_lookup_failure(self):
+        from pyramid_bubbling import BubblingConfigurationError
+        from pyramid_bubbling import Accessor
+        config = self.config
+        with self.assertRaises(BubblingConfigurationError):
+            config.verify_bubbling_path(K, [K, J, I], access=Accessor("*dummy*"))
+
+    def test_bound_event(self):
+        from pyramid_bubbling import Accessor
+        config = self.config
+        config.verify_bubbling_event(K, event_name="called", access=Accessor("parent"))
+
+    def test_bound_event__another_event_name(self):
+        from pyramid_bubbling import BubblingConfigurationError
+        from pyramid_bubbling import Accessor
+        config = self.config
+        with self.assertRaises(BubblingConfigurationError):
+            config.verify_bubbling_event(K, event_name="foo", access=Accessor("parent"))
 
 if __name__ == '__main__':
     unittest.main()

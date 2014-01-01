@@ -79,13 +79,12 @@ class BubblingOrderTests(unittest.TestCase):
         result = target.get_bubbling_path_order(D)
         compare(result, [D, C])
 
-    def test_if_orphan__raise_configurationError(self):
+    def test_if_orphan(self):
         ## d
         D = NodeFactory("D")
-        from pyramid_bubbling import BubblingConfigurationError
         target = self._makeOne()
-        with self.assertRaisesRegex(BubblingConfigurationError, "doesn't have bubbling relation"):
-            target.get_bubbling_path_order(D)
+        result = target.get_bubbling_path_order(D)
+        compare(result, [D])
 
 class BubblingEventSelfTests(unittest.TestCase):
     def _getTargetClass(self):
@@ -122,10 +121,11 @@ class BubblingEventSelfTests(unittest.TestCase):
     def test_it__stop(self):
         ## routing order: d -> c -> b -> a
         ## event: [d]
+        from pyramid_bubbling import Stop
         called = []
         def on_called__stop(self, subject):
             called.append(self)
-            return False
+            return Stop
         A = NodeFactory("A")
         A.on_called__stop = on_called__stop
         B = NodeFactory("B", parent=A)

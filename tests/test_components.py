@@ -22,7 +22,7 @@ def get_registry():
     from zope.interface.registry import Components
     return Components()
 
-class BubblingRegistryTests(unittest.TestCase):
+class BubblinglookupTests(unittest.TestCase):
     def _add_bubbling_path(self, *args, **kwargs):
         from pyramid_bubbling.components import _add_bubbling_path
         return _add_bubbling_path(*args, **kwargs)
@@ -39,7 +39,7 @@ class BubblingRegistryTests(unittest.TestCase):
         registry = get_registry()
         fn = ParentFromInstance(None, None)
         self._add_bubbling_path(registry, A, fn)
-        result = self._callFUT(registry, providedBy(A()))
+        result = self._callFUT(registry, [providedBy(A())])
         compare(result, fn)
 
 class BubblingOrderTests(unittest.TestCase):

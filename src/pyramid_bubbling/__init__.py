@@ -9,6 +9,15 @@ except ImportError:
 class BubblingConfigurationError(Exception):
     pass
 
+class _Singleton(object):
+    def __init__(self, name):
+        self.name = name
+
+    def __repr__(self):
+        return "<_Singleton {!r} at 0x{:x}>".format(self.name, id(self))
+Stop = _Singleton("Stop")
+
+
 class Accessor(object):
     def __init__(self, k="__parent__"):
         self.k = k
@@ -21,7 +30,7 @@ class Accessor(object):
 
     def get_notify(self, subject, case):
         method_name = "on_{}".format(case)
-        return getattr(subject, method_name)
+        return getattr(subject, method_name, None)
 
 class Bubbling(object):
     def __init__(self, access=None):
@@ -39,6 +48,8 @@ class Bubbling(object):
         iterator = self.get_iterator(leaf)
         result = []
         for target in iterator:
+            if target is None:
+                break
             if not isinstance(target, type):
                 raise BubblingConfigurationError("{} is not correct class".format(target))
             result.append(target)
@@ -56,6 +67,7 @@ class Bubbling(object):
             yield subject, notify
 
     def fire(self, startpoint, case, *args, **kwargs):
+        assert isinstance(case, str)
         iterator = self.get_iterator(startpoint)
         access = self.access
 
@@ -63,7 +75,7 @@ class Bubbling(object):
             notify = access.get_notify(subject, case)
             if callable(notify):
                 status = notify(subject, *args, **kwargs)
-                if status == False and type(status) == bool:
+                if status is Stop:
                     break
 
 

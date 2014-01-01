@@ -26,14 +26,14 @@ def make_interface_on_the_fly(cls):
     return iface
 
 def iface_from_class(Class, dynamic=True, Exception=Exception):
-    if isinstance(Class, InterfaceClass):
-        iface = Class
-    else:
-        iface = list(implementedBy(Class))
-
-    if not iface:
+    try:
+        if isinstance(Class, InterfaceClass):
+            iface = Class
+        else:
+            iface = next(iter(implementedBy(Class)))
+    except StopIteration:
         if dynamic:
-            return dynamic_interface(Class)
+            iface = dynamic_interface(Class)
         else:
             raise Exception("interface is not found from {}".format(Class))
     return iface

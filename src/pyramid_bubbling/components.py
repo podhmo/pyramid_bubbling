@@ -8,6 +8,7 @@ from zope.interface import (
 )
 from zope.interface.verify import verifyObject
 from zope.interface.interface import InterfaceClass
+from weakref import WeakValueDictionary
 
 class IParentFromInstanceAdapter(Interface):
     def __call__(instance):
@@ -47,14 +48,26 @@ class RegistryAccess(object):
     def __init__(self, registry, name=""):
         self.registry = registry
         self.name = name
+        self.cache = WeakValueDictionary()
+
+    def _get_relation(self, target):
+        try:
+            fn = self.cache[target]
+        except KeyError:
+            fn = _lookup(self.registry, providedBy(target), name=self.name)
+            if fn is None:
+                return fn
+            self.cache[target] = fn
+        return fn
 
     def exists(self, target):
         ## todo: speedup if need.
-        fn = _lookup(self.registry, providedBy(target), name=self.name)
+        fn = self._get_relation(target)
         return bool(fn and fn(target))
 
     def access(self, target):
-        return _lookup(self.registry, providedBy(target), name=self.name)(target)
+        fn = self._get_relation(target)
+        return fn(target)
 
     def get_notify(self, target, name):
         return self.registry.adapters.lookup([providedBy(target)], self.IEventFace, name=name)

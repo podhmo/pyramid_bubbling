@@ -23,9 +23,9 @@ def get_registry():
     return Components()
 
 class BubblingRegistryTests(unittest.TestCase):
-    def _register_parent_from_instance(self, *args, **kwargs):
-        from pyramid_bubbling.components import _register_parent_from_instance
-        return _register_parent_from_instance(*args, **kwargs)
+    def _add_bubbling_path(self, *args, **kwargs):
+        from pyramid_bubbling.components import _add_bubbling_path
+        return _add_bubbling_path(*args, **kwargs)
 
     def _callFUT(self, *args, **kwargs):
         from pyramid_bubbling.components import _lookup
@@ -38,14 +38,14 @@ class BubblingRegistryTests(unittest.TestCase):
 
         registry = get_registry()
         fn = ParentFromInstance(None, None)
-        self._register_parent_from_instance(registry, A, fn)
+        self._add_bubbling_path(registry, A, fn)
         result = self._callFUT(registry, providedBy(A()))
         compare(result, fn)
 
 class BubblingOrderTests(unittest.TestCase):
-    def _register_parent_from_instance(self, *args, **kwargs):
-        from pyramid_bubbling.components import _register_parent_from_instance
-        return _register_parent_from_instance(*args, **kwargs)
+    def _add_bubbling_path(self, *args, **kwargs):
+        from pyramid_bubbling.components import _add_bubbling_path
+        return _add_bubbling_path(*args, **kwargs)
 
     def _getTargetClass(self):
         from pyramid_bubbling import Bubbling
@@ -62,13 +62,13 @@ class BubblingOrderTests(unittest.TestCase):
         C = NodeFactory("C", "IC")
 
         registry = get_registry()
-        self._register_parent_from_instance(registry, A, ParentFromInstance(None, lambda cls: None));
-        self._register_parent_from_instance(registry, B, ParentFromInstance(None, lambda cls: A))
-        self._register_parent_from_instance(registry, C, ParentFromInstance(None, lambda cls: B))
+        self._add_bubbling_path(registry, A, ParentFromInstance(None, lambda cls: None));
+        self._add_bubbling_path(registry, B, ParentFromInstance(None, lambda cls: A))
+        self._add_bubbling_path(registry, C, ParentFromInstance(None, lambda cls: B))
 
         from pyramid_bubbling.components import RegistryAccessForClass
         target = self._makeOne(RegistryAccessForClass(registry))
-        result = target.get_iterator(C)
+        result = target.get_bubbling_path_order(C)
         compare(result, [C, B, A])
 
     def test_setting_default_one(self):
@@ -82,21 +82,21 @@ class BubblingOrderTests(unittest.TestCase):
         C.parent = B
 
         registry = get_registry()
-        self._register_parent_from_instance(registry, INode, ParentFromInstance(None, lambda cls: cls.parent));
+        self._add_bubbling_path(registry, INode, ParentFromInstance(None, lambda cls: cls.parent));
 
         from pyramid_bubbling.components import RegistryAccessForClass
         target = self._makeOne(RegistryAccessForClass(registry))
-        result = target.get_iterator(C)
+        result = target.get_bubbling_path_order(C)
         compare(result, [C, B, A])
 
 class BubblingEventRegistryTests(unittest.TestCase):
-    def _register_parent_from_instance(self, *args, **kwargs):
-        from pyramid_bubbling.components import _register_parent_from_instance
-        return _register_parent_from_instance(*args, **kwargs)
+    def _add_bubbling_path(self, *args, **kwargs):
+        from pyramid_bubbling.components import _add_bubbling_path
+        return _add_bubbling_path(*args, **kwargs)
 
-    def _register_routing_event(self, *args, **kwargs):
-        from pyramid_bubbling.components import _register_routing_event
-        return _register_routing_event(*args, **kwargs)
+    def _add_bubbling_event(self, *args, **kwargs):
+        from pyramid_bubbling.components import _add_bubbling_event
+        return _add_bubbling_event(*args, **kwargs)
 
     def _getTargetClass(self):
         from pyramid_bubbling import Bubbling
@@ -120,15 +120,15 @@ class BubblingEventRegistryTests(unittest.TestCase):
         registry = get_registry()
         def lookup_parent(self):
             return self.parent
-        self._register_parent_from_instance(registry, A, ParentFromInstance(lookup_parent, None))
-        self._register_parent_from_instance(registry, B, ParentFromInstance(lookup_parent, None))
-        self._register_parent_from_instance(registry, C, ParentFromInstance(lookup_parent, None))
-        self._register_parent_from_instance(registry, D, ParentFromInstance(lookup_parent, None))
+        self._add_bubbling_path(registry, A, ParentFromInstance(lookup_parent, None))
+        self._add_bubbling_path(registry, B, ParentFromInstance(lookup_parent, None))
+        self._add_bubbling_path(registry, C, ParentFromInstance(lookup_parent, None))
+        self._add_bubbling_path(registry, D, ParentFromInstance(lookup_parent, None))
 
-        self._register_routing_event(registry, A, on_called, name="called")
-        self._register_routing_event(registry, B, on_called, name="called")
-        self._register_routing_event(registry, C, on_called, name="called")
-        self._register_routing_event(registry, D, on_called, name="called")
+        self._add_bubbling_event(registry, A, on_called, name="called")
+        self._add_bubbling_event(registry, B, on_called, name="called")
+        self._add_bubbling_event(registry, C, on_called, name="called")
+        self._add_bubbling_event(registry, D, on_called, name="called")
 
         a = A()
         b = B(a)
@@ -157,8 +157,8 @@ class BubblingEventRegistryTests(unittest.TestCase):
         def lookup_parent(self):
             return self.parent
         relation = ParentFromInstance(lookup_parent, None)
-        self._register_parent_from_instance(registry, INode, relation)
-        self._register_routing_event(registry, INode, on_called, name="called")
+        self._add_bubbling_path(registry, INode, relation)
+        self._add_bubbling_event(registry, INode, on_called, name="called")
 
         a = A()
         b = B(a)
@@ -188,9 +188,9 @@ class BubblingEventRegistryTests(unittest.TestCase):
         def lookup_parent(self):
             return self.parent
         relation = ParentFromInstance(lookup_parent, None)
-        self._register_parent_from_instance(registry, INode, relation)
-        self._register_routing_event(registry, INode, on_called, name="called")
-        self._register_routing_event(registry, C, on_called_double, name="called")
+        self._add_bubbling_path(registry, INode, relation)
+        self._add_bubbling_event(registry, INode, on_called, name="called")
+        self._add_bubbling_event(registry, C, on_called_double, name="called")
 
         c = C()
         d = D(c)
@@ -212,12 +212,12 @@ class BubblingEventRegistryTests(unittest.TestCase):
         registry = get_registry()
         def lookup_parent(self):
             return self.parent
-        self._register_parent_from_instance(registry, B, ParentFromInstance(lookup_parent, None))
-        self._register_parent_from_instance(registry, D, ParentFromInstance(lookup_parent, None))
+        self._add_bubbling_path(registry, B, ParentFromInstance(lookup_parent, None))
+        self._add_bubbling_path(registry, D, ParentFromInstance(lookup_parent, None))
 
         def on_called(self):
             called.append(self)
-        self._register_routing_event(registry, INode, on_called, name="called")
+        self._add_bubbling_event(registry, INode, on_called, name="called")
 
         a = A()
         b = B(a)
@@ -249,12 +249,12 @@ class BubblingEventRegistryTests(unittest.TestCase):
         def lookup_parent(self):
             return self.parent
 
-        self._register_parent_from_instance(registry, B, ParentFromInstance(lookup_parent, None), name="bar")
-        self._register_parent_from_instance(registry, D, ParentFromInstance(lambda s : s.parent.parent, None), name="bar")
+        self._add_bubbling_path(registry, B, ParentFromInstance(lookup_parent, None), name="bar")
+        self._add_bubbling_path(registry, D, ParentFromInstance(lambda s : s.parent.parent, None), name="bar")
 
-        self._register_routing_event(registry, D, on_bar, name="bar")
-        self._register_routing_event(registry, B, on_bar, name="bar")
-        self._register_routing_event(registry, A, on_bar, name="bar")
+        self._add_bubbling_event(registry, D, on_bar, name="bar")
+        self._add_bubbling_event(registry, B, on_bar, name="bar")
+        self._add_bubbling_event(registry, A, on_bar, name="bar")
 
         a = A()
         b = B(a)
@@ -271,12 +271,12 @@ class BubblingEventRegistryTests(unittest.TestCase):
         def on_foo(self):
             foo.append(self)
 
-        self._register_parent_from_instance(registry, C, ParentFromInstance(lookup_parent, None), name="foo")
-        self._register_parent_from_instance(registry, D, ParentFromInstance(lookup_parent, None), name="foo")
+        self._add_bubbling_path(registry, C, ParentFromInstance(lookup_parent, None), name="foo")
+        self._add_bubbling_path(registry, D, ParentFromInstance(lookup_parent, None), name="foo")
 
-        self._register_routing_event(registry, D, on_foo, name="foo")
-        self._register_routing_event(registry, C, on_foo, name="foo")
-        self._register_routing_event(registry, B, on_foo, name="foo")
+        self._add_bubbling_event(registry, D, on_foo, name="foo")
+        self._add_bubbling_event(registry, C, on_foo, name="foo")
+        self._add_bubbling_event(registry, B, on_foo, name="foo")
 
         target = self._makeOne(RegistryAccess(registry, name="foo"))
         target.fire(d, "foo")

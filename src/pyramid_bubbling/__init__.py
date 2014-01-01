@@ -1,6 +1,11 @@
 # -*- coding:utf-8 -*-
 
 import operator as op
+try:
+    from pyramid.exceptions import ConfigurationError
+except ImportError:
+    ConfigurationError = Exception
+
 class BubblingConfigurationError(Exception):
     pass
 
@@ -30,16 +35,25 @@ class Bubbling(object):
             target = access.access(target)
             yield target
 
-    def get_bubbling_order(self, leaf):
+    def get_bubbling_path_order(self, leaf):
         iterator = self.get_iterator(leaf)
         result = []
         for target in iterator:
             if not isinstance(target, type):
                 raise BubblingConfigurationError("{} is not correct class".format(target))
             result.append(target)
-        if len(result) <= 1:
-            raise BubblingConfigurationError("{} doesn't have bubbling relation".format(leaf))
+        # if len(result) <= 1:
+        #     raise BubblingConfigurationError("{} doesn't have bubbling relation".format(leaf))
         return result
+
+
+    def get_ordered_event(self, startpoint, case, *args, **kwargs):
+        iterator = self.get_iterator(startpoint)
+        access = self.access
+
+        for subject in iterator:
+            notify = access.get_notify(subject, case)
+            yield subject, notify
 
     def fire(self, startpoint, case, *args, **kwargs):
         iterator = self.get_iterator(startpoint)
@@ -76,3 +90,9 @@ def bubbling_attribute_factory(parent_class, attr):
     else:
         return BubblingAttribute(parent_class, attr)
 
+
+def includeme(config):
+    config.add_directive("add_bubbling_event", config.maybe_dotted(".components.add_bubbling_event"))
+    config.add_directive("add_bubbling_path", config.maybe_dotted(".components.add_bubbling_path"))
+    config.add_directive("verify_bubbling_path", config.maybe_dotted(".components.verify_bubbling_path"))
+    config.add_directive("verify_bubbling_event", config.maybe_dotted(".components.verify_bubbling_event"))

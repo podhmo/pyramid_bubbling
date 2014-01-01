@@ -63,7 +63,7 @@ class BubblingOrderTests(unittest.TestCase):
         D = NodeFactory("D", parent=C)
 
         target = self._makeOne()
-        result = target.get_bubbling_order(D)
+        result = target.get_bubbling_path_order(D)
         compare(result, [D, C, B, A])
 
 
@@ -76,7 +76,7 @@ class BubblingOrderTests(unittest.TestCase):
 
         target = self._makeOne()
 
-        result = target.get_bubbling_order(D)
+        result = target.get_bubbling_path_order(D)
         compare(result, [D, C])
 
     def test_if_orphan__raise_configurationError(self):
@@ -85,7 +85,7 @@ class BubblingOrderTests(unittest.TestCase):
         from pyramid_bubbling import BubblingConfigurationError
         target = self._makeOne()
         with self.assertRaisesRegex(BubblingConfigurationError, "doesn't have bubbling relation"):
-            target.get_bubbling_order(D)
+            target.get_bubbling_path_order(D)
 
 class BubblingEventSelfTests(unittest.TestCase):
     def _getTargetClass(self):

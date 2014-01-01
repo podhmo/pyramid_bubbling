@@ -8,7 +8,8 @@ version = '0.0'
 
 requires = [
     "setuptools",
-    "pyramid"
+    "zope.interface", 
+    "venusian"
 ]
 
 tests_require = [

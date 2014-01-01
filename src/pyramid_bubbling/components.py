@@ -1,4 +1,5 @@
 # -*- coding:utf-8 -*-
+import venusian
 from zope.interface import (
     Interface,
     implementer,
@@ -9,6 +10,11 @@ from zope.interface import (
 from zope.interface.verify import verifyObject
 from zope.interface.interface import InterfaceClass
 from weakref import WeakValueDictionary
+from . import (
+    Bubbling, 
+    BubblingConfigurationError
+)
+from .util import iface_from_class
 
 class IParentFromInstanceAdapter(Interface):
     def __call__(instance):
@@ -21,7 +27,7 @@ class IBubbling(Interface):
     def get_iterator(startpoint):
         pass
 
-    def get_bubbling_order(leaf):
+    def get_bubbling_path_order(leaf):
         pass
 
     def fire(startpoint, case):
@@ -44,7 +50,6 @@ class IEvent(Interface):
 
 @implementer(IAccess)
 class RegistryAccess(object):
-    IEventFace = IEvent
     def __init__(self, registry, name=""):
         self.registry = registry
         self.name = name
@@ -70,7 +75,7 @@ class RegistryAccess(object):
         return fn(target)
 
     def get_notify(self, target, name):
-        return self.registry.adapters.lookup([providedBy(target)], self.IEventFace, name=name)
+        return self.registry.adapters.lookup([providedBy(target)], IEvent, name=name)
 
 
 @implementer(IAccess)
@@ -86,6 +91,10 @@ class RegistryAccessForClass(object):
 
     def access(self, target):
         return _lookup(self.registry, implementedBy(target), name=self.name).from_class(target)
+
+    def get_notify(self, target, name):
+        return self.registry.adapters.lookup([implementedBy(target)], IEvent, name=name)
+
 
 @implementer(IParentFromInstanceAdapter)
 class ParentFromInstance(object):
@@ -112,27 +121,56 @@ pyramid_bubbling.Accessor = implementer(IAccess)(Accessor)
 
 
 
-def _register_parent_from_instance(registry, ParentFromInstanceClass, fn, name=""):
-    verifyObject(IParentFromInstanceAdapter, fn)
-    if isinstance(ParentFromInstanceClass, InterfaceClass):
-        iface = ParentFromInstanceClass
-    else:
-        iface = implementedBy(ParentFromInstanceClass)
-    registry.adapters.register([iface], IParentFromInstanceAdapter, name, fn)
+def _add_bubbling_path(registry, ParentFromInstanceClass, parent_from_instance, name="", dynamic=True):
+    verifyObject(IParentFromInstanceAdapter, parent_from_instance)
+    iface = iface_from_class(ParentFromInstanceClass, dynamic=dynamic, Exception=BubblingConfigurationError)
+    if not isinstance(iface, (list, tuple)):
+        iface = [iface]
+    registry.adapters.register(iface, IParentFromInstanceAdapter, name, parent_from_instance)
 
-def register_parent_from_instance(config, instanceClass, fn, name=""):
-    _register_parent_from_instance(config.registry, config.maybe_dotted(instanceClass), fn, name=name)
+def add_bubbling_path(config, instanceClass, parent_from_instance, name=""):
+    _add_bubbling_path(config.registry, config.maybe_dotted(instanceClass), parent_from_instance, name=name)
 
-def _register_routing_event(registry, SubjectClass, fn, name="", ievent_face=IEvent):
-    if isinstance(SubjectClass, InterfaceClass):
-        iface = SubjectClass
-    else:
-        iface = implementedBy(SubjectClass)
-    registry.adapters.register([iface], ievent_face, name, provider(ievent_face)(fn))
+def _add_bubbling_event(registry, SubjectClass, fn, name="", dynamic=True):
+    iface = iface_from_class(SubjectClass, dynamic=dynamic, Exception=BubblingConfigurationError)
+    if not isinstance(iface, (list, tuple)):
+        iface = [iface]
+    registry.adapters.register(iface, IEvent, name, provider(IEvent)(fn))
 
+def add_bubbling_event(config, SubjectClass, fn, name=""):
+    _add_bubbling_event(config.registry, config.maybe_dotted(SubjectClass), fn, name=name)
 
 def _lookup(registry, obj, name=""):
-    return registry.adapters.lookup([obj], IParentFromInstanceAdapter, name=name)
+    return registry.adapters.lookup1(obj, IParentFromInstanceAdapter, name=name)
 
 def lookup(request, iface, name=""):
     return _lookup(request.registry, iface, name=name)
+
+##
+def bubbling_event_config(SubjectClass, name=""):
+    def _(wrapped):
+        def callback(context, name, ob):
+            config = context.config.with_package(info.module)
+            config.add_bubbling_event(SubjectClass, wrapped, name=name)
+
+        info = venusian.attach(wrapped, callback, category='pyramid')
+        return wrapped
+    return _
+
+def verify_bubbling_path(config, startpoint, expected, name=""):
+    from pyramid.config.util import MAX_ORDER
+    def register():
+        bubbling = Bubbling(RegistryAccessForClass(config.registry))
+        result = bubbling.get_bubbling_path_order(startpoint)
+        if not (result == expected):
+            raise BubblingConfigurationError("expected:{} != result:{}".format(expected, result))
+    config.action(None, register, order=MAX_ORDER)
+
+def verify_bubbling_event(config, startpoint, event_name="", path_name=""):
+    bubbling = Bubbling(RegistryAccessForClass(config.registry, path_name))
+    r = []
+    for subject, ev in bubbling.get_ordered_event(startpoint, event_name):
+        if ev is None:
+            raise BubblingConfigurationError("subject={}, not bound event.".format(subject))
+        r.append(ev)
+    return r

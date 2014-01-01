@@ -97,6 +97,7 @@ class BubblingEventSelfTests(unittest.TestCase):
 
     def test_it(self):
         ## d -> c -> b -> a
+        ## event: [d, c, b, a]
         called = []
         def on_called(self, subject):
             called.append(self)
@@ -117,6 +118,31 @@ class BubblingEventSelfTests(unittest.TestCase):
         target.fire(d, "called")
 
         compare(called, [d, c, b, a])
+
+    def test_it__stop(self):
+        ## routing order: d -> c -> b -> a
+        ## event: [d]
+        called = []
+        def on_called__stop(self, subject):
+            called.append(self)
+            return False
+        A = NodeFactory("A")
+        A.on_called__stop = on_called__stop
+        B = NodeFactory("B", parent=A)
+        B.on_called__stop = on_called__stop
+        C = NodeFactory("C", parent=B)
+        C.on_called__stop = on_called__stop
+        D = NodeFactory("D", parent=C)
+        D.on_called__stop = on_called__stop
+        a = A()
+        b = B(a)
+        c = C(b)
+        d = D(c)
+
+        target = self._makeOne()
+        target.fire(d, "called__stop")
+
+        compare(called, [d])
 
     def test_not_connected(self):
         ## d -> c. b -> a

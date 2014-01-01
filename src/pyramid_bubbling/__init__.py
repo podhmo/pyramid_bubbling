@@ -48,7 +48,9 @@ class Bubbling(object):
         for subject in iterator:
             notify = access.get_notify(subject, case)
             if callable(notify):
-                notify(subject, *args, **kwargs)
+                status = notify(subject, *args, **kwargs)
+                if status == False and type(status) == bool:
+                    break
 
 
 class BubblingAttribute(property):

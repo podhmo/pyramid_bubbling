@@ -1,12 +1,16 @@
 # -*- coding:utf-8 -*-
 
 import operator as op
-try:
-    from pyramid.exceptions import ConfigurationError
-except ImportError:
-    ConfigurationError = Exception
+from zope.interface import implementer
+from pyramid.exceptions import ConfigurationError
 
-class BubblingConfigurationError(Exception):
+from .interfaces import (
+    IBubbling, 
+    IAccess
+)
+
+
+class BubblingConfigurationError(ConfigurationError):
     pass
 
 class _Singleton(object):
@@ -18,6 +22,7 @@ class _Singleton(object):
 Stop = _Singleton("Stop")
 
 
+@implementer(IAccess)
 class Accessor(object):
     def __init__(self, k="__parent__"):
         self.k = k
@@ -32,6 +37,7 @@ class Accessor(object):
         method_name = "on_{}".format(case)
         return getattr(subject, method_name, None)
 
+@implementer(IBubbling)
 class Bubbling(object):
     def __init__(self, access=None):
         self.access = access or Accessor()

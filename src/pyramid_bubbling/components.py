@@ -1,8 +1,12 @@
 # -*- coding:utf-8 -*-
 import venusian
-import itertools
+from .interfaces import (
+    IAccess, 
+    IEvent, 
+    IParentFromInstanceAdapter
+)
+
 from zope.interface import (
-    Interface,
     implementer,
     provider, 
     providedBy,
@@ -16,37 +20,6 @@ from . import (
 )
 from .util import iface_from_class
 
-class IParentFromInstanceAdapter(Interface):
-    def __call__(instance):
-        pass
-
-    def from_class(cls):
-        pass
-
-class IBubbling(Interface):
-    def get_iterator(startpoint):
-        pass
-
-    def get_bubbling_path_order(leaf):
-        pass
-
-    def fire(startpoint, case):
-        pass
-
-
-class IAccess(Interface):
-    def exists(target):
-        pass
-
-    def access(target):
-        pass
-
-    def notify(subject, method_name, *args, **kwargs):
-        pass
-
-class IEvent(Interface):
-    def __call__(subject, *args, **kwargs):
-        pass
 
 @implementer(IAccess)
 class RegistryAccess(object):
@@ -116,14 +89,6 @@ class ParentFromInstance(object):
     def from_class(self, *args, **kwargs):
         return self.cls_lookup(*args, **kwargs)
 
-import pyramid_bubbling
-Bubbling = pyramid_bubbling.Bubbling
-pyramid_bubbling.Bubbling = implementer(IBubbling)(Bubbling)
-Accessor = pyramid_bubbling.Accessor
-pyramid_bubbling.Accessor = implementer(IAccess)(Accessor)
-
-
-
 def _add_bubbling_path(registry, ParentFromInstanceClass, parent_from_instance, name="", dynamic=True):
     verifyObject(IParentFromInstanceAdapter, parent_from_instance)
     iface = iface_from_class(ParentFromInstanceClass, dynamic=dynamic, Exception=BubblingConfigurationError)
@@ -169,14 +134,14 @@ class bubbling_event_config(object):
 def verify_bubbling_path(config, startpoint, expected, name="", access=None):
     from pyramid.config.util import MAX_ORDER
     def register():
-        bubbling = Bubbling(access or get_bubbling_registry_access(config, name))
+        bubbling = Bubbling(access or RegistryAccessForClass(config.registry, name=name))
         result = bubbling.get_bubbling_path_order(startpoint)
         if not (result == expected):
             raise BubblingConfigurationError("expected:{} != result:{}".format(expected, result))
     config.action(None, register, order=MAX_ORDER)
 
 def verify_bubbling_event(config, startpoint, event_name="", path_name="", access=None):
-    bubbling = Bubbling(access or get_bubbling_registry_access(config, path_name))
+    bubbling = Bubbling(access or RegistryAccessForClass(config.registry, name=path_name))
     r = []
     for subject, ev in bubbling.get_ordered_event(startpoint, event_name):
         if subject is None:
@@ -188,7 +153,4 @@ def verify_bubbling_event(config, startpoint, event_name="", path_name="", acces
             ))
         r.append(ev)
     return r
-
-def get_bubbling_registry_access(config, path_name=""):
-    return RegistryAccessForClass(config.registry, name=path_name)
 

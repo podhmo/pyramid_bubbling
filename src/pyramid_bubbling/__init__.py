@@ -50,8 +50,8 @@ class Bubbling(object):
         for target in iterator:
             if target is None:
                 break
-            if not isinstance(target, type):
-                raise BubblingConfigurationError("{} is not correct class".format(target))
+            # if not isinstance(target, type):
+            #     raise BubblingConfigurationError("{} is not correct class".format(target))
             result.append(target)
         # if len(result) <= 1:
         #     raise BubblingConfigurationError("{} doesn't have bubbling relation".format(leaf))

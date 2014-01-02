@@ -150,16 +150,21 @@ def _lookup(registry, obj, name=""):
 def lookup(request, iface, name=""):
     return _lookup(request.registry, iface, name=name)
 
-##
-def bubbling_event_config(SubjectClass, name=""):
-    def _(wrapped):
+
+class bubbling_event_config(object):
+    def __init__(self, SubjectClass, name=""):
+        self.SubjectClass = SubjectClass
+        self.name = name
+
+    def __call__(self, wrapped):
         def callback(context, name, ob):
             config = context.config.with_package(info.module)
-            config.add_bubbling_event(SubjectClass, wrapped, name=name)
+            config.add_bubbling_event(self.SubjectClass, wrapped, name=self.name)
 
-        info = venusian.attach(wrapped, callback, category='pyramid')
+        #info = venusian.attach(wrapped, callback, category='pyramid_bubbling', depth=1)
+        info = venusian.attach(wrapped, callback, category='pyramid_bubbling')
         return wrapped
-    return _
+
 
 def verify_bubbling_path(config, startpoint, expected, name="", access=None):
     from pyramid.config.util import MAX_ORDER

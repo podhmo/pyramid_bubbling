@@ -41,20 +41,22 @@ with testConfig() as config:
 
 
     ## click
+    print("----------------click------------------------")
     result = []
     bubbling.fire(button, "click", result)
 
     assert result == [('button', '3'), ('area', '2'), ('document', '1')]
-
+    print(result)
     for x in bubbling.get_ordered_event(button, "click"):
         print(x)
 
 
     ## tap
+    print("----------------tap------------------------")
     result = []
     bubbling.fire(button, "tap", result)
     assert result == [('tap', '3'), ('tap', '2'), ('tap', '1')]
-
+    print(result)
     for x in bubbling.get_ordered_event(button, "tap"):
         print(x)
 

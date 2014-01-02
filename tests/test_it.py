@@ -173,9 +173,6 @@ class UseRegistryIntegrationTests(unittest.TestCase):
         )
         from pyramid_bubbling.components import RegistryAccess
 
-        class IStopArea(Interface):
-            pass
-        @implementer(IStopArea)
         class StopArea(Area):
             pass
 
@@ -183,7 +180,7 @@ class UseRegistryIntegrationTests(unittest.TestCase):
             click_simple(subject, result)
             return Stop
 
-        self.config.add_bubbling_event(IStopArea, click_simple_stop, "click")
+        self.config.add_bubbling_event(StopArea, click_simple_stop, "click")
 
         top = StopArea("stop_top", self.doc)
         item2 = Node("stop_item2", top)

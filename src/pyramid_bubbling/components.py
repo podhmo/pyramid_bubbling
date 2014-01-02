@@ -1,5 +1,6 @@
 # -*- coding:utf-8 -*-
 import venusian
+import itertools
 from zope.interface import (
     Interface,
     implementer,
@@ -8,7 +9,6 @@ from zope.interface import (
     implementedBy
 )
 from zope.interface.verify import verifyObject
-from zope.interface.interface import InterfaceClass
 from weakref import WeakValueDictionary
 from . import (
     Bubbling, 
@@ -186,3 +186,4 @@ def verify_bubbling_event(config, startpoint, event_name="", path_name="", acces
 
 def get_bubbling_registry_access(config, path_name=""):
     return RegistryAccessForClass(config.registry, name=path_name)
+

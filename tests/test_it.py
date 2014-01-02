@@ -9,7 +9,6 @@ from zope.interface import Interface, implementer
 class INode(Interface):
     pass
 
-@implementer(INode)
 class Document(object):
     def __init__(self, name):
         self.name = name
@@ -18,6 +17,9 @@ class Document(object):
         result.append(("document", self.name))
 
 @implementer(INode)
+class DocumentWithInterface(Document):
+    pass
+
 class Area(object):
     def __init__(self, name, document):
         self.name = name
@@ -31,6 +33,11 @@ class Area(object):
         return self.document
 
 @implementer(INode)
+class AreaWithInterface(Area):
+    @bubbling_attribute(DocumentWithInterface)
+    def __parent__(self):
+        return self.document
+
 class Node(object):
     def __init__(self, name, area):
         self.name = name
@@ -43,9 +50,18 @@ class Node(object):
     def __parent__(self):
         return self.area
 
+@implementer(INode)
+class NodeWithInterface(Node):
+    @bubbling_attribute(AreaWithInterface)
+    def __parent__(self):
+        return self.area
+
 
 def click_simple(subject, result):
     return result.append(subject.name)
+
+def make_request(config):
+    return testing.DummyRequest(registry=config.registry)
 
 class SelfCaseIntegrationTests(unittest.TestCase):
     def setUp(self):
@@ -64,23 +80,9 @@ class SelfCaseIntegrationTests(unittest.TestCase):
         self.bottom = Area("bottom", self.doc)
         self.item3 = Node("item3", self.bottom)
 
-    def test_configuration(self):
-        """click item2 => bubbling: node, area, document"""
-        with testing.testConfig() as config:
-            from pyramid_bubbling import (
-                Accessor
-            )
-            config.include("pyramid_bubbling")
-            config.verify_bubbling_path(Node, [Node, Area, Document], access=Accessor("__parent__"))
-            result = config.verify_bubbling_event(Node,  event_name="click", access=Accessor("__parent__"))
-            compare(result, [Node.on_click, Area.on_click, Document.on_click])
-
     def test_it(self):
         """click item2 => bubbling: node, area, document"""
-        from pyramid_bubbling import (
-            Bubbling, 
-            Accessor
-        )
+        from pyramid_bubbling import Bubbling, Accessor
 
         bubbling = Bubbling(access=Accessor("__parent__"))
         result = []
@@ -90,12 +92,8 @@ class SelfCaseIntegrationTests(unittest.TestCase):
 
     def test_stop(self):
         """click item2_ => bubbling: node, area[stop]"""
-
-        from pyramid_bubbling import (
-            Bubbling, 
-            Accessor, 
-            Stop
-        )
+        from pyramid_bubbling import Bubbling, Accessor
+        from pyramid_bubbling import Stop
 
         class StopArea(Area):
             def on_click(self, *args, **kwargs):
@@ -110,6 +108,17 @@ class SelfCaseIntegrationTests(unittest.TestCase):
 
         compare(result, [("node", "stop_item2"), ("area", "stop_top")])
 
+    def test_configuration(self):
+        """click item2 => bubbling: node, area, document"""
+        from pyramid_bubbling import (
+            Accessor
+        )
+        with testing.testConfig() as config:
+            config.include("pyramid_bubbling")
+            config.verify_bubbling_path(Node, [Node, Area, Document], access=Accessor("__parent__"))
+            result = config.verify_bubbling_event(Node,  event_name="click", access=Accessor("__parent__"))
+            compare(result, [Node.on_click, Area.on_click, Document.on_click])
+
 class UseRegistryIntegrationTests(unittest.TestCase):
     def setUp(self):
         """
@@ -122,12 +131,12 @@ class UseRegistryIntegrationTests(unittest.TestCase):
         """
         from pyramid_bubbling.components import ParentFromInstance
 
-        self.doc = Document("doc")
-        self.top = Area("top", self.doc)
-        self.item1 = Node("item1", self.top)
-        self.item2 = Node("item2", self.top)
-        self.bottom = Area("bottom", self.doc)
-        self.item3 = Node("item3", self.bottom)
+        self.doc = DocumentWithInterface("doc")
+        self.top = AreaWithInterface("top", self.doc)
+        self.item1 = NodeWithInterface("item1", self.top)
+        self.item2 = NodeWithInterface("item2", self.top)
+        self.bottom = AreaWithInterface("bottom", self.doc)
+        self.item3 = NodeWithInterface("item3", self.bottom)
 
         ## config
         self.config = testing.setUp()
@@ -143,22 +152,11 @@ class UseRegistryIntegrationTests(unittest.TestCase):
         from pyramid_bubbling.util import clean_dynamic_interface
         clean_dynamic_interface()
 
-    def test_configuration(self):
-        """click item2 => bubbling: node, area, document"""
-        config = self.config
-
-        config.verify_bubbling_path(Node, [Node, Area, Document])
-        result = config.verify_bubbling_event(Node,  event_name="click")
-        compare(result, [click_simple, click_simple, click_simple])
-
     def test_it(self):
         """click item2 => bubbling: node, area, document"""
-        from pyramid_bubbling import (
-            Bubbling, 
-        )
-        from pyramid_bubbling.components import RegistryAccess
+        from pyramid_bubbling.api import get_bubbling
 
-        bubbling = Bubbling(access=RegistryAccess(self.config.registry)) #xxx:
+        bubbling = get_bubbling(make_request(self.config), self.item2)
         result = []
         bubbling.fire(self.item2, "click", result)
         compare(result, ['item2', 'top', 'doc'])
@@ -168,12 +166,11 @@ class UseRegistryIntegrationTests(unittest.TestCase):
         """click item2_ => bubbling: node, area[stop]"""
 
         from pyramid_bubbling import (
-            Bubbling, 
             Stop
         )
-        from pyramid_bubbling.components import RegistryAccess
+        from pyramid_bubbling.api import get_bubbling
 
-        class StopArea(Area):
+        class StopArea(AreaWithInterface):
             pass
 
         def click_simple_stop(subject, result):
@@ -183,11 +180,20 @@ class UseRegistryIntegrationTests(unittest.TestCase):
         self.config.add_bubbling_event(StopArea, click_simple_stop, "click")
 
         top = StopArea("stop_top", self.doc)
-        item2 = Node("stop_item2", top)
-        bubbling = Bubbling(access=RegistryAccess(self.config.registry)) #xxx:
+        item2 = NodeWithInterface("stop_item2", top)
+
+        bubbling = get_bubbling(make_request(self.config), item2)
         result = []
         bubbling.fire(item2, "click", result)
         compare(result, ["stop_item2", "stop_top"])
+
+    def test_configuration(self):
+        """click item2 => bubbling: node, area, document"""
+        config = self.config
+
+        config.verify_bubbling_path(NodeWithInterface, [NodeWithInterface, AreaWithInterface, DocumentWithInterface])
+        result = config.verify_bubbling_event(NodeWithInterface,  event_name="click")
+        compare(result, [click_simple, click_simple, click_simple])
 
 if __name__ == '__main__':
     unittest.main()

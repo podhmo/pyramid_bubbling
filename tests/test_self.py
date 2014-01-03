@@ -94,6 +94,16 @@ class BubblingEventSelfTests(unittest.TestCase):
     def _makeOne(self, *args, **kwargs):
         return self._getTargetClass()(*args, **kwargs)
 
+    def test_bound_event_is_not_found__raise_exception(self):
+        from pyramid_bubbling import BubblingRuntimeException
+
+        A = NodeFactory("A")
+        a = A()
+
+        target = self._makeOne()
+        with self.assertRaises(BubblingRuntimeException):
+            target.fire(a, "undefined_event")
+
     def test_it(self):
         ## d -> c -> b -> a
         ## event: [d, c, b, a]

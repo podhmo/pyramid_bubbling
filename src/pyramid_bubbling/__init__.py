@@ -13,6 +13,9 @@ from .interfaces import (
 class BubblingConfigurationError(ConfigurationError):
     pass
 
+class BubblingRuntimeException(Exception):
+    pass
+
 class _Singleton(object):
     def __init__(self, name):
         self.name = name
@@ -20,7 +23,7 @@ class _Singleton(object):
     def __repr__(self):
         return "<_Singleton {!r} at 0x{:x}>".format(self.name, id(self))
 Stop = _Singleton("Stop")
-
+Start = _Singleton("Sart")
 
 @implementer(IAccess)
 class Accessor(object):
@@ -77,12 +80,15 @@ class Bubbling(object):
         iterator = self.get_iterator(startpoint)
         access = self.access
 
+        status = Start
         for subject in iterator:
             notify = access.get_notify(subject, case)
             if callable(notify):
                 status = notify(subject, *args, **kwargs)
                 if status is Stop:
                     break
+        if status is Start:
+            raise BubblingRuntimeException("case={}: event not found".format(case))
 
 
 class BubblingAttribute(property):
